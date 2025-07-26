@@ -3,6 +3,7 @@ from crewai import Agent, Task, Crew, Process
 from get_weather import Weather
 from llm_connection import Llm_connection
 
+
 connection = Llm_connection()
 model = connection.connection()
 

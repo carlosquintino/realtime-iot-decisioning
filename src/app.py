@@ -1,6 +1,7 @@
 from confluent_kafka import Consumer, KafkaException
 import json
 
+
 conf = {
     "bootstrap.servers": "localhost:9091",
     "group.id": "sensor-consumer-group",

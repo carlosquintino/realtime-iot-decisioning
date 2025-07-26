@@ -25,6 +25,7 @@ class Weather():
 
         return request.json()
 
+
 # class WeatherForecastTool(BaseTool):
 #     name: str = "Get Weather Forecast"
 #     description: str = (
