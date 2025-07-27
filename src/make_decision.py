@@ -68,14 +68,53 @@ class MakeDecision():
             - Timestamp or reference to when the data was collected (if available)""",
             agent=self.sensor_analyst
         )
+    
+    def decision_agent(self):
+        self.irrigation_decision_agent = Agent(
+            role="Irrigation Strategy Specialist",
+            goal=f"Make a data-driven irrigation decision based on current weather and plantation conditions as of {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.",
+            backstory="""You are a domain expert in smart irrigation and precision agriculture.
+            You are responsible for determining whether irrigation is necessary based on summarized weather forecasts and field sensor snapshots.
+            You must reason using both weather risk factors (rain probability and intensity) and current soil conditions (humidity and temperature).
+            Be conservative with water use — do not irrigate if rainfall is imminent or humidity is already sufficient.""",
+            verbose=True,
+            allow_delegation=False
+        )
+    
+    def decision_task(self):
+        self.irrigation_decision_task = Task(
+            description=(
+                f"You are given two summaries:\n\n"
+                f"1. **Weather Summary**:\n{self.weather_summary_task}\n\n"
+                f"2. **Sensor Summary**:\n{self.sensor_snapshot_summary_task}\n\n"
+                f"Based on this information, decide if the plantation **should be irrigated now**.\n"
+                f"Consider the soil humidity (e.g., low/medium/high), forecasted rain (e.g., probability and intensity), and temperature (if relevant).\n\n"
+                f"Respond with one of the following options:\n"
+                f"- 'Irrigation Recommended: Yes.' with a short justification.\n"
+                f"- 'Irrigation Recommended: No.' with a short justification.\n"
+                f"Optionally, include 'Suggested Duration: X minutes' if irrigation is recommended."
+            ),
+            expected_output="A short and justified decision about irrigation, e.g.: 'Irrigation Recommended: No. Rain expected within 2 hours (80% probability). Humidity is medium.'",
+            agent=self.irrigation_decision_agent
+        )
+    def run(self):
+        # 1. Agentes
+        self.weather_analyst()
+        self.sensor_analyst()
 
-# crew = Crew(
-#     agents=[weather_analyst],
-#     tasks=[weather_summary_task],
-#     verbose=True
-# )
+        # 2. Tasks para agentes de clima e sensor
+        self.weather_task()
+        self.sensor_task()
 
-# result = crew.kickoff()
-# print(result)
+        # 3. Executa crews separadamente para obter os resumos
+        weather_summary = Crew(agents=[self.weather_analyst], tasks=[self.weather_summary_task], verbose=True).kickoff()
+        sensor_summary = Crew(agents=[self.sensor_analyst], tasks=[self.sensor_snapshot_summary_task], verbose=True).kickoff()
 
-# make_decision()
+        # 4. Agente e task de decisão (com os resumos como entrada)
+        self.decision_agent()
+        self.decision_task()
+
+        # 5. Executa decisão
+        final_decision = Crew(agents=[self.irrigation_decision_agent], tasks=[self.irrigation_decision_task], verbose=True).kickoff()
+
+        print("🌱 Final Decision:\n", final_decision)
