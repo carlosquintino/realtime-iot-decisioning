@@ -10,7 +10,7 @@ conf = {
 }
 consumer = Consumer(conf)
 
-topic_name = "servidor_sensor.Sensor.dbo.LeiturasUmidade"
+topic_name = "magistrala_postgres.public.humidity_readings"
 consumer.subscribe([topic_name])
 
 print(f"Consumindo mensagens do tópico: {topic_name}")

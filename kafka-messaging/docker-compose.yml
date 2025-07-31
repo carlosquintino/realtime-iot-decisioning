@@ -1,33 +1,36 @@
 networks:
   kafka-network:
 
+volumes:
+  magistrala-db-volume: {}
+  zookeeper_data: {}
+  kafka_data: {}
+
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sqlserver
+  ui-backend-db:
+    image: postgres:16.2-alpine
+    container_name: magistrala-db
+    restart: on-failure
+    command: postgres -c max_connections=100 -c wal_level=logical
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "Teste@123"
+      POSTGRES_USER: magistrala_user
+      POSTGRES_PASSWORD: supersecret
+      POSTGRES_DB: magistrala_db
+      SMQ_POSTGRES_MAX_CONNECTIONS: 100
     ports:
-      - "1433:1433"
+      - 6008:5432
     networks:
       - kafka-network
     volumes:
-      - mssql_data:/var/opt/mssql
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"Teste@123\" -Q \"SELECT 1\" || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - magistrala-db-volume:/var/lib/postgresql/data
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
     environment:
-        ZOOKEEPER_CLIENT_PORT: 2181
-        ZOOKEEPER_TICK_TIME: 2000
-        ALLOW_ANONYMOUS_LOGIN: yes
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ALLOW_ANONYMOUS_LOGIN: yes
     ports:
       - "2181:2181"
     networks:
@@ -55,7 +58,6 @@ services:
       - kafka-network
     volumes:
       - kafka_data:/var/lib/kafka/data
-    # CORREÇÃO: Adicionado healthcheck para garantir que o Kafka está pronto.
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:19091 --list"]
       interval: 15s
@@ -85,7 +87,6 @@ services:
               url: http://kafka-connect:8083
     ports:
       - 8080:8080
-    # CORREÇÃO: Alterado para esperar a condição de 'service_healthy' do Kafka.
     depends_on:
       kafka1:
         condition: service_healthy
@@ -95,34 +96,29 @@ services:
       - kafka-network
 
   kafka-connect:
-    image: dbz-sql-conn
+    image: debezium/connect:2.6  # <-- Altere esta linha
     container_name: kafka-connect
-    ports:
+    ports :
       - "8083:8083"
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: "kafka1:19091"
-      CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
-      CONNECT_GROUP_ID: "debezium-connect-cluster"
-      CONNECT_CONFIG_STORAGE_TOPIC: "connect_configs"
-      CONNECT_OFFSET_STORAGE_TOPIC: "connect_offsets"
-      CONNECT_STATUS_STORAGE_TOPIC: "connect_status"
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: false
-      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: false
+      # As variáveis de ambiente são as mesmas
+      BOOTSTRAP_SERVERS: "kafka1:19091" # <-- O Debezium usa essa variável
+      GROUP_ID: "debezium-connect-cluster"
+      CONFIG_STORAGE_TOPIC: "connect_configs"
+      OFFSET_STORAGE_TOPIC: "connect_offsets"
+      STATUS_STORAGE_TOPIC: "connect_status"
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      KEY_CONVERTER_SCHEMAS_ENABLE: false
+      VALUE_CONVERTER_SCHEMAS_ENABLE: false
       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      # A variável CONNECT_PLUGIN_PATH não é mais necessária
     depends_on:
       kafka1:
         condition: service_healthy
     networks:
       - kafka-network
-
-volumes:
-  mssql_data: {}
-  zookeeper_data: {}
-  kafka_data: {}
