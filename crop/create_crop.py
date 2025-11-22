@@ -4,11 +4,15 @@ import matplotlib.pyplot as plt
 from datetime import date, timedelta,datetime
 import requests
 import math
+import openpyxl
+from openpyxl.styles import numbers
 
 from pcse.models import Wofost72_WLP_FD
-from pcse.fileinput import YAMLAgroManagementReader,CABOFileReader
+from pcse.fileinput import YAMLAgroManagementReader,CABOFileReader,ExcelWeatherDataProvider
 from pcse.util import WOFOST72SiteDataProvider, DummySoilDataProvider
+
 from pcse.base import ParameterProvider, WeatherDataContainer
+ 
 
 
 class CropCreation(DummySoilDataProvider):
@@ -112,23 +116,37 @@ class CropCreation(DummySoilDataProvider):
 
                 # Converter radiação de J/m2 para kJ/m2
                 irrad_kj = float(daily_data['shortwave_radiation_sum'][i]) / 1000.0
-
-                row = {
-                    'DAY': day, 'TMIN': tmin, 'TMAX': tmax,
-                    'IRRAD': irrad_kj, # Usar o valor convertido
-                    'RAIN': float(daily_data['precipitation_sum'][i]),
-                    'WIND': float(daily_data['wind_speed_10m_max'][i]),
-                    'VAP': vap, 
-                    'SNOWDEPTH': -99,
-                }
+                
+                row = [
+                    day ,irrad_kj, tmin, tmax,
+                    vap,float(daily_data['wind_speed_10m_max'][i]),
+                    float(daily_data['precipitation_sum'][i]), -999
+                    ]
                 self.enriched_weather_data.append(row)
             
+                
+                
             except (ValueError, TypeError, KeyError) as e:
                 print(f"Aviso: Dados inválidos ou ausentes para o dia {day_str}. Pulando. Erro: {e}")
                 continue
+        INPUT_PATH = 'dummy_file.xlsx'
+        OUTPUT_PATH = 'data_weather.xlsx'
+
+        START_LINE = 13
+        
+        wb = openpyxl.load_workbook(INPUT_PATH)
+        ws = wb.active    
 
         if not self.enriched_weather_data:
             raise ValueError("Nenhum dado climático válido foi processado da Open-Meteo.")
+        
+        for i, data in enumerate(self.enriched_weather_data, start=START_LINE):
+            for j, value in enumerate(data, start=1):
+                ws.cell(row=i, column=j, value=value)
+                # cell = ws.cell(row=i, column=j, value=value)
+                # if j == 1 and isinstance(value, (date, datetime)):
+                #     cell.number_format = numbers.FORMAT_DATE_MMDDYYYY
+        wb.save(OUTPUT_PATH)
 
     def _days_gone(self):
         self.days_crop += 1
@@ -143,16 +161,21 @@ class CropCreation(DummySoilDataProvider):
         self.soil_data = self._get_soil_from_json(self.soil_file)
         
         # Transforma a lista de dicionários em um dicionário de listas
-        weather_keywords = {key: [d[key] for d in self.enriched_weather_data] for key in self.enriched_weather_data[0]}
+        # weather_keywords = {key: [d[key] for d in self.enriched_weather_data] for key in self.enriched_weather_data[0]}
 
+        # print(weather_keywords)
+    
         # Inicializa o provedor de dados climáticos, fornecendo TODOS os parâmetros de site necessários
-        weather_data_provider = WeatherDataContainer(**weather_keywords, 
-                                                     location_name=f"Open-Meteo", 
-                                                     LAT=self.latitude,
-                                                     LON=self.longitude,
-                                                     ELEV=self.elevation,
-                                                     ANGSTA=0.1, # Coeficiente de Angstrom A (valor padrão)
-                                                     ANGSTB=0.1) # Coeficiente de Angstrom B (valor padrão)
+        # weather_data_provider = WeatherDataContainer(**weather_keywords, 
+        #                                              location_name=f"Open-Meteo", 
+        #                                              LAT=self.latitude,
+        #                                              LON=self.longitude,
+        #                                              ELEV=self.elevation,
+        #                                              ANGSTA=0.1, # Coeficiente de Angstrom A (valor padrão)
+        #                                              ANGSTB=0.1) # Coeficiente de Angstrom B (valor padrão)
+
+        weather_data_provider = ExcelWeatherDataProvider('data_weather.xlsx')
+        print(f'Keywords {weather_data_provider}')
         
         print('Carregado parametros do clima')
         # Carrega os dados da cultura e do local
@@ -166,6 +189,10 @@ class CropCreation(DummySoilDataProvider):
         
         # Passa o dicionário de dados do solo, não a classe
         self.params = ParameterProvider(cropdata=crop_data, soildata=self.soil_data, sitedata=site_data)
+
+        campaigns = list(self.agromanagement)
+        print(type(campaigns[0]['CropCalendar']['crop_start_date']))
+
         
         # Inicializa o modelo WOFOST
         self.wofost = Wofost72_WLP_FD(self.params, weather_data_provider, self.agromanagement)
@@ -195,7 +222,7 @@ class CropCreation(DummySoilDataProvider):
             }
         }
         self.wofost.agromanagement.append(irrigation_event)
-        print(f"Evento de irrigação de {amount_mm}mm agendado para {self.current_date}.")
+        print(f"Evento de irrigação de {amount_mm} mm agendado para {self.current_date}.")
 
     def _run(self, days: int):
         """
