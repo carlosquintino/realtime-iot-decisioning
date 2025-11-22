@@ -1,4 +1,3 @@
-import pcse
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,8 +6,7 @@ import requests
 import math
 
 from pcse.models import Wofost72_WLP_FD
-from pcse.fileinput import YAMLAgroManagementReader, YAMLCropDataProvider,CABOFileReader
-# CORREÇÃO: DummySoilDataProvider foi movido para pcse.util
+from pcse.fileinput import YAMLAgroManagementReader,CABOFileReader
 from pcse.util import WOFOST72SiteDataProvider, DummySoilDataProvider
 from pcse.base import ParameterProvider, WeatherDataContainer
 
