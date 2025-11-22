@@ -7,7 +7,7 @@ import requests
 import math
 
 from pcse.models import Wofost72_WLP_FD
-from pcse.fileinput import YAMLAgroManagementReader, CABOFileReader
+from pcse.fileinput import YAMLAgroManagementReader, YAMLCropDataProvider,CABOFileReader
 # CORREÇÃO: DummySoilDataProvider foi movido para pcse.util
 from pcse.util import WOFOST72SiteDataProvider, DummySoilDataProvider
 from pcse.base import ParameterProvider, WeatherDataContainer
@@ -20,7 +20,7 @@ class CropCreation(DummySoilDataProvider):
                  longitude:float, 
                  start_date:str, 
                  end_date:str, 
-                 crop_file:str='crop_file.cab', 
+                 crop_file:str='soyean_cab.cab', 
                  agro_file:str='agro_file.yaml', 
                  soil_file:str='soil_file.json'):
         
@@ -156,8 +156,11 @@ class CropCreation(DummySoilDataProvider):
                                                      ANGSTA=0.1, # Coeficiente de Angstrom A (valor padrão)
                                                      ANGSTB=0.1) # Coeficiente de Angstrom B (valor padrão)
         
+        print('Carregado parametros do clima')
         # Carrega os dados da cultura e do local
         crop_data = CABOFileReader(self.crop_file)
+        # crop_data = YAMLCropDataProvider(self.crop_file)
+        print('Carregado parametros do soybean')
         site_data = WOFOST72SiteDataProvider(WAV=100)
         
         # Carrega o manejo agronômico

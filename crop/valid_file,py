@@ -1,0 +1,13 @@
+import pcse
+import os
+
+# Descobrir onde o PCSE está instalado
+pcse_path = os.path.dirname(pcse.__file__)
+print(f"PCSE instalado em: {pcse_path}")
+
+# Procurar arquivos de cultura
+crop_path = os.path.join(pcse_path, 'data', 'crop')
+if os.path.exists(crop_path):
+    print("Arquivos de cultura encontrados:")
+    for file in os.listdir(crop_path):
+        print(f"  - {file}")
