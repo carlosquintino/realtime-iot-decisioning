@@ -1,12 +1,14 @@
 AgroManagement:
   - 2023-01-01:
     CropCalendar:
-      crop_name: soybean
-      variety_name: soybean_tropical_generic
+      crop_name: SOYBEAN
+      variety_name: BRS_284
       crop_start_date: 2023-01-01
       crop_start_type: sowing
-      crop_end_date: 2023-04-01
-      crop_end_type: harvest
       max_duration: 150
     StateEvents: []
-    TimedEvents: []
+    TimedEvents: 
+      - date: 2023-04-01
+        event_type: harvest 
+        parameters:
+          remove_crop: True  

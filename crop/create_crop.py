@@ -134,7 +134,11 @@ class CropCreation(DummySoilDataProvider):
         START_LINE = 13
         
         wb = openpyxl.load_workbook(INPUT_PATH)
-        ws = wb.active    
+        ws = wb.active
+
+        ws.cell(row=9, column=1, value=self.longitude)
+        ws.cell(row=9, column=2, value=self.latitude)
+        ws.cell(row=9, column=3, value=self.elevation)
 
         if not self.enriched_weather_data:
             raise ValueError("Nenhum dado climático válido foi processado da Open-Meteo.")
@@ -165,8 +169,7 @@ class CropCreation(DummySoilDataProvider):
         print('Carregado parametros do clima')
         # Carrega os dados da cultura e do local
         crop_data = CABOFileReader(self.crop_file)
-        # crop_data = YAMLCropDataProvider(self.crop_file)
-        print('Carregado parametros do soybean')
+        
         site_data = WOFOST72SiteDataProvider(WAV=100)
         
         # Carrega o manejo agronômico
@@ -219,15 +222,6 @@ class CropCreation(DummySoilDataProvider):
         original_rain = daily_weather.RAIN
         daily_weather.RAIN += amount_cm
 
-        # irrigation_event = {
-        #     'date': self.current_date,
-        #     'event_signal': 'apply_irrigation',
-        #     'event_parameters': {
-        #         'amount': amount_mm,
-        #         'efficiency': efficiency
-        #     }
-        # }
-        # self.wofost.TimedEvents.append(irrigation_event)
         print(f"Evento de irrigação de {amount_mm} mm agendado para {self.current_date}.")
 
     def _run(self, days: int):
@@ -237,15 +231,25 @@ class CropCreation(DummySoilDataProvider):
         if not self.wofost:
             print("Erro: A simulação não foi inicializada. Chame initialize_simulation() primeiro.")
             return
-            
-        print(f"Executando simulação por {days} dias a partir de {self.current_date}...")
+        
+        # self.wofost.run_till_terminate()
+        # output = self.wofost.get_output()
+        # for day in output:
+        #     print(day)
+                
+        # print(f"Executando simulação por {days} dias a partir de {self.current_date}...")
+
         try:
             for _ in range(days):
+        
                 self.wofost.run(days=1)
                 # Garante que a saída não esteja vazia antes de adicionar
                 current_output = self.wofost.get_output()
+                print(current_output)
                 if current_output:
-                    self.output.append(current_output[0])
+                    self.output.append(current_output[-1])
+                else:
+                    print('Sem output')
                 self.current_date += timedelta(days=1)
                 self._days_gone()
         except Exception as e:
@@ -332,12 +336,17 @@ if __name__ == '__main__':
     simulador = CropCreation(latitude=latitude_suzano,
                              longitude=longitude_suzano,
                              start_date='20230101',
-                             end_date='20230401')
+                             end_date='20230601')
                              
     simulador.initialize_simulation()
-    # simulador._run(days=1)
+    
     simulador.irrigation(amount_mm=10)
-    # simulador.plot_simulation()
+    simulador._run(days=1)
+    simulador._run(days=1)
+    simulador._run(days=1)
+    simulador._run(days=1)
+    simulador._run(days=1)
+    simulador.plot_simulation()
     
     # # 3. Executar e visualizar
     # simulador._run(days=90)
