@@ -5,13 +5,12 @@ from datetime import date, timedelta,datetime
 import requests
 import math
 import openpyxl
-from openpyxl.styles import numbers
 
 from pcse.models import Wofost72_WLP_FD
 from pcse.fileinput import YAMLAgroManagementReader,CABOFileReader,ExcelWeatherDataProvider
 from pcse.util import WOFOST72SiteDataProvider, DummySoilDataProvider
-
-from pcse.base import ParameterProvider, WeatherDataContainer
+from pcse.agromanager import AgroManager
+from pcse.base import ParameterProvider
  
 
 
@@ -159,20 +158,6 @@ class CropCreation(DummySoilDataProvider):
         
         # Carrega os dados do solo do arquivo JSON
         self.soil_data = self._get_soil_from_json(self.soil_file)
-        
-        # Transforma a lista de dicionários em um dicionário de listas
-        # weather_keywords = {key: [d[key] for d in self.enriched_weather_data] for key in self.enriched_weather_data[0]}
-
-        # print(weather_keywords)
-    
-        # Inicializa o provedor de dados climáticos, fornecendo TODOS os parâmetros de site necessários
-        # weather_data_provider = WeatherDataContainer(**weather_keywords, 
-        #                                              location_name=f"Open-Meteo", 
-        #                                              LAT=self.latitude,
-        #                                              LON=self.longitude,
-        #                                              ELEV=self.elevation,
-        #                                              ANGSTA=0.1, # Coeficiente de Angstrom A (valor padrão)
-        #                                              ANGSTB=0.1) # Coeficiente de Angstrom B (valor padrão)
 
         weather_data_provider = ExcelWeatherDataProvider('data_weather.xlsx')
         print(f'Keywords {weather_data_provider}')
@@ -187,12 +172,7 @@ class CropCreation(DummySoilDataProvider):
         # Carrega o manejo agronômico
         self.agromanagement = YAMLAgroManagementReader(self.agro_file)
         
-        # Passa o dicionário de dados do solo, não a classe
         self.params = ParameterProvider(cropdata=crop_data, soildata=self.soil_data, sitedata=site_data)
-
-        campaigns = list(self.agromanagement)
-        print(type(campaigns[0]['CropCalendar']['crop_start_date']))
-
         
         # Inicializa o modelo WOFOST
         self.wofost = Wofost72_WLP_FD(self.params, weather_data_provider, self.agromanagement)
@@ -212,16 +192,42 @@ class CropCreation(DummySoilDataProvider):
         if not self.wofost:
             print("Erro: A simulação não foi inicializada. Chame initialize_simulation() primeiro.")
             return
+        
+        amount_cm = (amount_mm * efficiency)
+        wdp = self.wofost.weatherdataprovider
+        storage = getattr(wdp, '_store', getattr(wdp, 'store', None))
 
-        irrigation_event = {
-            'date': self.current_date,
-            'event_signal': 'apply_irrigation',
-            'event_parameters': {
-                'amount': amount_mm,
-                'efficiency': efficiency
-            }
-        }
-        self.wofost.agromanagement.append(irrigation_event)
+        print(storage)
+        if not storage:
+            print("Erro crítico: Não foi possível acessar o armazenamento de dados climáticos.")
+            return
+        
+        target_date = datetime.strptime(self.current_date.strftime("%Y-%m-%d"), "%Y-%m-%d").date()
+
+        target_key = (target_date, 0)
+
+        if target_key not in storage:
+            # Tenta converter para datetime (formato comum do Excel)
+            target_date_as_datetime = datetime(target_date.year, target_date.month, target_date.day)
+            if target_date_as_datetime in storage:
+                target_date = target_date_as_datetime
+            else:
+                print(f"Aviso: Dados climáticos não encontrados para {self.current_date}. Irrigação ignorada.")
+                return
+        
+        daily_weather = storage[target_key]
+        original_rain = daily_weather.RAIN
+        daily_weather.RAIN += amount_cm
+
+        # irrigation_event = {
+        #     'date': self.current_date,
+        #     'event_signal': 'apply_irrigation',
+        #     'event_parameters': {
+        #         'amount': amount_mm,
+        #         'efficiency': efficiency
+        #     }
+        # }
+        # self.wofost.TimedEvents.append(irrigation_event)
         print(f"Evento de irrigação de {amount_mm} mm agendado para {self.current_date}.")
 
     def _run(self, days: int):
@@ -255,17 +261,29 @@ class CropCreation(DummySoilDataProvider):
         
         results = pd.DataFrame(self.output)
         results = results.set_index('day')
+        print(results.dtypes)
+        print(results.head())
 
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12, 15))
+               
+        try:
+            results['SM'].plot(ax=axes[2], title='Umidade na Zona Radicular (SM)', grid=True)
+            axes[2].set_ylabel('cm')
+        except:
+            pass
+
+        try:
+            results['TAGP'].plot(ax=axes[0], title='Biomassa Total da Parte Aérea (TAGP)', grid=True)
+            axes[0].set_ylabel('kg/ha')
+        except:
+            pass
         
-        results['TAGP'].plot(ax=axes[0], title='Biomassa Total da Parte Aérea (TAGP)', grid=True)
-        axes[0].set_ylabel('kg/ha')
-        
-        results['LAI'].plot(ax=axes[1], title='Índice de Área Foliar (LAI)', grid=True)
-        axes[1].set_ylabel('m2/m2')
-        
-        results['SM'].plot(ax=axes[2], title='Umidade na Zona Radicular (SM)', grid=True)
-        axes[2].set_ylabel('cm')
+        try:
+    
+            results['LAI'].plot(ax=axes[1], title='Índice de Área Foliar (LAI)', grid=True)
+            axes[1].set_ylabel('m2/m2')
+        except:
+            pass
 
         fig.tight_layout()
         plt.show()
@@ -317,6 +335,9 @@ if __name__ == '__main__':
                              end_date='20230401')
                              
     simulador.initialize_simulation()
+    # simulador._run(days=1)
+    simulador.irrigation(amount_mm=10)
+    # simulador.plot_simulation()
     
     # # 3. Executar e visualizar
     # simulador._run(days=90)
