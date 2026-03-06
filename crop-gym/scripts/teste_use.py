@@ -2,8 +2,14 @@ from crop_create import CreateCrop
 
 from pcse.fileinput import CABOFileReader, YAMLCropDataProvider
 from pcse.util import WOFOST80SiteDataProvider
+from pcse.db import NASAPowerWeatherDataProvider
+
+latitude_suzano = 52
+longitude_suzano = 5.5
 
 env = CreateCrop(
+    latitude=latitude_suzano,
+    longitude=longitude_suzano,
     model_config='Wofost80_NWLP_FD.conf',
     agro_config='/home/ubuntu/pgc/realtime-iot-decisioning/crop-gym/PCSE-Gym/pcse_gym/envs/configs/agro/potato_cropcalendar.yaml',
     crop_parameters=YAMLCropDataProvider(force_reload=True),
@@ -12,7 +18,8 @@ env = CreateCrop(
                                              PAVAILI=50,  # Amount of P available in the pool at initialization of the system [kg/ha]
                                              KAVAILI=100,  # Amount of K available in the pool at initialization of the system [kg/ha]
                                              ),
-    soil_parameters=CABOFileReader('/home/ubuntu/pgc/realtime-iot-decisioning/crop-gym/PCSE-Gym/pcse_gym/envs/configs/soil/ec3.CAB'),
+    soil_parameters=CABOFileReader('/home/ubuntu/pgc/realtime-iot-decisioning/crop-gym/PCSE-Gym/pcse_gym/envs/configs/soil/ec3.CAB')
+    
 )
 
 a1 = action = {
@@ -25,9 +32,7 @@ a2 = action = {
                 'N': 0,
             }
 
-print(env.get_current_weather())
 env.aply_action(action=a1)
-
 
 # Exemplo: comparar soil water antes/depois
 # before = env.crop_data[-1]["prev_obs"]
