@@ -4,8 +4,8 @@ from pcse.fileinput import CABOFileReader, YAMLCropDataProvider
 from pcse.util import WOFOST80SiteDataProvider
 from pcse.db import NASAPowerWeatherDataProvider
 
-latitude_suzano = 52
-longitude_suzano = 5.5
+latitude_suzano = -23.54
+longitude_suzano = -46.32
 
 env = CreateCrop(
     latitude=latitude_suzano,
