@@ -20,7 +20,7 @@ env = CreateCrop(
                                              ),
     soil_parameters=CABOFileReader('/home/ubuntu/pgc/realtime-iot-decisioning/crop-gym/PCSE-Gym/pcse_gym/envs/configs/soil/ec3.CAB')
     
-)
+) 
 
 a1 = action = {
                 'irrigation': 0,
