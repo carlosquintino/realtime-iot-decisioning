@@ -1,0 +1,24 @@
+# Copyright (c) Abstract Machines
+# SPDX-License-Identifier: Apache-2.0
+
+raw_output = "false"
+user_token = ""
+
+[filter]
+  limit = "10"
+  offset = "0"
+  topic = ""
+
+[remotes]
+  journal_url = "http://localhost:9021"
+  bootstrap_url = "http://localhost:9013"
+  certs_url = "http://localhost:9019"
+  domains_url = "http://localhost:9003"
+  host_url = "http://localhost"
+  http_adapter_url = "http://localhost:8008"
+  reader_url = "http://localhost:9011"
+  clients_url = "http://localhost:9006"
+  channels_url = "http://localhost:9005"
+  groups_url = "http://localhost:9004"
+  users_url = "http://localhost:9002"
+  tls_verification = false
