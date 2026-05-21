@@ -34,15 +34,15 @@ class FarmSimulator:
             creds = json.load(f)
 
         self.farm_id       = creds["farm_id"]
+        self.domain_id     = creds["domain_id"]
         self.channel_id    = creds["channel_id"]
         self.client_secret = creds["client_secret"]
 
         # Full publish URL — the only Magistrala endpoint the farm needs.
-        # Subtopic pattern:  <farm_id>/daily
-        # e.g. http://192.168.1.100/http/channels/<uuid>/messages/farm-001/daily
+        # Magistrala v0.19+ topic format: m/<domain_id>/c/<channel_id>/<subtopic>
         adapter = creds["http_adapter_url"].rstrip("/")
         self._publish_url = (
-            f"{adapter}/channels/{self.channel_id}/messages/{self.farm_id}/daily"
+            f"{adapter}/m/{self.domain_id}/c/{self.channel_id}/{self.farm_id}/daily"
         )
 
         self._session = requests.Session()

@@ -48,10 +48,10 @@ def get_token(session: requests.Session, base: str) -> str:
 def create_domain(session: requests.Session, base: str, token: str) -> str:
     r = session.post(f"{base}/domains",
         headers={"Authorization": f"Bearer {token}"},
-        json={"name": DOMAIN_NAME, "alias": DOMAIN_NAME},
+        json={"name": DOMAIN_NAME, "route": DOMAIN_NAME},
     )
-    # 409 = já existe; busca pelo alias
-    if r.status_code == 409:
+    # 409 ou 400 "route not available" = já existe; busca pelo route
+    if r.status_code in (409, 400) and ("route not available" in r.text or r.status_code == 409):
         print(f"  Domain '{DOMAIN_NAME}' já existe, buscando ID...")
         r2 = session.get(f"{base}/domains",
             headers={"Authorization": f"Bearer {token}"},
@@ -59,7 +59,7 @@ def create_domain(session: requests.Session, base: str, token: str) -> str:
         )
         _raise(r2, "buscar domain")
         domains = r2.json().get("domains", [])
-        match = next((d for d in domains if d["alias"] == DOMAIN_NAME), None)
+        match = next((d for d in domains if d["route"] == DOMAIN_NAME), None)
         if not match:
             print("[ERROR] Domain não encontrado após conflito.", file=sys.stderr)
             sys.exit(1)
@@ -132,6 +132,7 @@ def main():
         "farm_id":          farm_id,
         "magistrala_url":   base,
         "http_adapter_url": http_adapter_url,
+        "domain_id":        domain_id,
         "channel_id":       channel_id,
         "client_id":        client_id,
         "client_secret":    client_secret,
