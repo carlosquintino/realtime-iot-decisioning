@@ -17,15 +17,15 @@ import (
 )
 
 const (
-	AllTopic = "writers.>"
+	AllTopic = "m.>"
 
-	prefix = "writers"
+	prefix = "m"
 )
 
 var cfg = jetstream.StreamConfig{
-	Name:              "writers",
-	Description:       "SuperMQ Rules Engine stream for handling internal messages",
-	Subjects:          []string{"writers.>"},
+	Name:              "m",
+	Description:       "SuperMQ stream for sending and receiving messages in between SuperMQ channels",
+	Subjects:          []string{"m.>"},
 	Retention:         jetstream.LimitsPolicy,
 	MaxMsgsPerSubject: 1e6,
 	MaxAge:            time.Hour * 24,

@@ -1,0 +1,11 @@
+# Serviço LAI (chat conversacional + MCP)
+# Versões soltas: litellm e fastmcp compartilham deps (httpx/pydantic) — deixar o
+# pip resolver evita conflito de resolução.
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.34,<0.35
+litellm>=1.60
+fastmcp>=2.3
+psycopg2-binary>=2.9
+itsdangerous>=2.2
+requests>=2.32
+python-dotenv>=1.0

@@ -52,6 +52,9 @@ class FarmSimulator:
         })
 
         self.env = crop_env
+        # Epoch (t) do último dia publicado — usado para correlacionar o comando
+        # que volta pelo loop fechado (ver command_listener.py).
+        self.last_published_epoch = None
         print(f"[{self.farm_id}] Pronto. Publicando em: {self._publish_url}")
 
     # ── internal helpers ─────────────────────────────────────────────────────
@@ -104,6 +107,7 @@ class FarmSimulator:
         entry   = self.env.crop_data[-1]
         payload = self._build_senml(entry)
         sim_day = self._sim_date(entry["days_gone"])
+        self.last_published_epoch = int(time.mktime(sim_day.timetuple()))
 
         dvs = entry["obs"]["crop_model"].get("DVS", [None])[0]
         sm  = entry["obs"]["crop_model"].get("SM",  [None])[0]
@@ -120,7 +124,7 @@ class FarmSimulator:
         except requests.RequestException as e:
             print(f"[{self.farm_id}] {sim_day}  FALHA ao enviar: {e}")
 
-    def run_season(self, action_fn=None):
+    def run_season(self, action_fn=None, max_days=None):
         """
         Runs the full crop season day by day until PCSE signals termination.
 
@@ -130,12 +134,20 @@ class FarmSimulator:
             action_fn(env) -> dict
             Called every day to decide the action.
             Defaults to no irrigation and no fertilization.
+        max_days : int, optional
+            Limita a temporada a N dias (útil para testes do loop fechado sem
+            estourar a cota do LLM). Default: roda até o PCSE sinalizar o fim.
         """
         print(f"[{self.farm_id}] Iniciando temporada de simulação...")
+        day = 0
         while True:
             action = action_fn(self.env) if action_fn else {"irrigation": 0, "N": 0}
             self.run_day(action)
+            day += 1
             if self.env.crop_data[-1]["done"]:
+                break
+            if max_days is not None and day >= max_days:
+                print(f"[{self.farm_id}] Limite de {max_days} dias atingido (--max-days).")
                 break
 
         total = len(self.env.crop_data)

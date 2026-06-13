@@ -1,0 +1,43 @@
+# Serviço `decisioning` — feature da plataforma Magistrala.
+# Consome dados de fazenda via MQTT, decide irrigação/N com CrewAI, persiste no
+# Postgres (db decisions @ re-db) e publica o comando de volta (loop fechado).
+#
+# Depende do docker-compose principal (rede magistrala-base-net). Rodar com:
+#   docker compose -f docker/docker-compose.yaml \
+#     -f docker/addons/decisioning/docker-compose.yaml up -d decisioning
+# (já incluído no `make run_latest`).
+
+networks:
+  magistrala-base-net:
+    driver: bridge
+
+services:
+  decisioning:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    image: realtime-iot/decisioning:latest
+    container_name: magistrala-decisioning
+    restart: on-failure
+    environment:
+      MQTT_HOST: ${DECISIONING_MQTT_HOST:-supermq-mqtt}
+      MQTT_PORT: ${DECISIONING_MQTT_PORT:-1883}
+      MQTT_PROTOCOL_ID: ${DECISIONING_MQTT_PROTOCOL_ID:-ai-decisioning}
+      MQTT_CLIENT_ID: ${DECISIONING_CLIENT_ID}
+      MQTT_CLIENT_SECRET: ${DECISIONING_CLIENT_SECRET}
+      DOMAIN_ID: ${DECISIONING_DOMAIN_ID}
+      CHANNEL_ID: ${DECISIONING_CHANNEL_ID}
+      DATABASE_URL: ${DECISIONING_DATABASE_URL:-postgresql://magistrala:magistrala@magistrala-re-db:5432/decisions}
+      LLM_PROVIDER: ${DECISIONING_LLM_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${DECISIONING_OPENAI_MODEL:-gpt-4o}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${DECISIONING_GEMINI_MODEL:-gemini/gemini-1.5-flash}
+      LOCAL_MODEL: ${DECISIONING_LOCAL_MODEL:-ollama/llama3}
+      LOCAL_API_BASE: ${DECISIONING_LOCAL_API_BASE:-http://host.docker.internal:11434}
+      LOCAL_API_KEY: ${DECISIONING_LOCAL_API_KEY:-not-needed}
+      WEATHER_LOCATION: ${DECISIONING_WEATHER_LOCATION:-Sao Paulo}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # p/ LLM_PROVIDER=local alcançar o host
+    networks:
+      - magistrala-base-net

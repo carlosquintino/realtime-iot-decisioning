@@ -1,8 +1,8 @@
 # Copyright (c) Abstract Machines
 # SPDX-License-Identifier: Apache-2.0
 
-# To listen all message broker subjects use default value "writers.>".
-# To subscribe to specific subjects use values starting by "writers." and
-# followed by a subtopic (e.g ["writers.<channel_id>.sub.topic.x", ...]).
+# Magistrala v0.19+ publica mensagens no subject "m.>" (stream "m"), nao "writers.>".
+# Para assinar todos os subjects do broker use "m.>".
+# Para subjects especificos use ["m.<domain>.c.<channel>.<subtopic>", ...].
 ["subscriber"]
-subjects = ["writers.>"]
+subjects = ["m.>"]

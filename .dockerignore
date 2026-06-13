@@ -1,0 +1,12 @@
+# Mantém o build context do serviço decisioning enxuto: só src/ importa.
+magistrala/
+crop-gym/
+crop/
+img/
+.git/
+.claude/
+**/__pycache__/
+**/*.pyc
+**/venv/
+**/.venv/
+*.md

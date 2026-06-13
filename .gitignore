@@ -1,3 +1,15 @@
 src/.env
 comandos/cdc_sql.txt
 comandos/conexao.txt
+
+# Claude Code (sessão, configs locais e instruções de projeto)
+CLAUDE.md
+.claude/
+.mcp.json
+
+# Segredos — NUNCA versionar (chaves de LLM, secrets de client, certs)
+magistrala/docker/.env
+magistrala/docker/supermq-docker/.env
+magistrala/docker/supermq-docker/addons/certs/.env
+crop-gym/decisioning_credentials.json
+crop-gym/farm_credentials.json

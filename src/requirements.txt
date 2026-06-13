@@ -1,0 +1,9 @@
+# Dependências do serviço decisioning (imagem Docker). Não inclui pcse (crop-gym).
+crewai
+crewai-tools
+google-genai            # provider nativo do Gemini no crewai (LLM_PROVIDER=gemini)
+paho-mqtt>=2.0
+psycopg2-binary
+pydantic
+python-dotenv
+requests

@@ -15,8 +15,10 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import sys
+from urllib.parse import urlparse
 
 # Allow running from any working directory
 _DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +27,7 @@ sys.path.insert(0, os.path.join(_DIR, "..", "PCSE-Gym"))
 from pcse.fileinput import CABOFileReader, YAMLCropDataProvider
 from pcse.util import WOFOST80SiteDataProvider
 
+from command_listener import CommandListener
 from crop_create import CreateCrop
 from farm_simulator import FarmSimulator
 
@@ -42,7 +45,7 @@ LONGITUDE = -46.32
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def build_crop_env() -> CreateCrop:
+def build_crop_env(wav: float = 10) -> CreateCrop:
     return CreateCrop(
         latitude=LATITUDE,
         longitude=LONGITUDE,
@@ -50,7 +53,7 @@ def build_crop_env() -> CreateCrop:
         agro_config=AGRO_CONFIG,
         crop_parameters=YAMLCropDataProvider(force_reload=True),
         site_parameters=WOFOST80SiteDataProvider(
-            WAV=10,       # initial water in soil profile [cm]
+            WAV=wav,      # initial water in soil profile [cm] (baixo = solo seco)
             NAVAILI=10,   # initial N pool [kg/ha]
             PAVAILI=50,   # initial P pool [kg/ha]
             KAVAILI=100,  # initial K pool [kg/ha]
@@ -66,6 +69,17 @@ def main():
         default=os.path.join(_DIR, "farm_credentials.json"),
         help="Caminho para farm_credentials.json",
     )
+    parser.add_argument("--mqtt-host", default=None,
+                        help="Host do broker MQTT (default: host do magistrala_url das credenciais)")
+    parser.add_argument("--mqtt-port", type=int, default=1883)
+    parser.add_argument("--decision-timeout", type=float, default=120.0,
+                        help="Segundos a aguardar a decisão da IA por dia antes do fallback")
+    parser.add_argument("--open-loop", action="store_true",
+                        help="Roda sem esperar a IA (no_intervention), como antes")
+    parser.add_argument("--max-days", type=int, default=None,
+                        help="Limita a temporada a N dias (teste do loop sem estourar a cota do LLM)")
+    parser.add_argument("--wav", type=float, default=10,
+                        help="Água inicial no perfil do solo [cm]. Baixo (ex.: 1-2) = solo seco p/ forçar irrigação")
     args = parser.parse_args()
 
     if not os.path.exists(args.credentials):
@@ -77,19 +91,57 @@ def main():
         sys.exit(1)
 
     print("Inicializando ambiente de simulação da cultura...")
-    crop_env = build_crop_env()
+    crop_env = build_crop_env(wav=args.wav)
 
     farm = FarmSimulator(
         credentials_path=args.credentials,
         crop_env=crop_env,
     )
 
-    # Estratégia de ação: sem irrigação e sem fertilizante por padrão.
-    # Substitua esta função por um agente de IA quando estiver pronto.
     def no_intervention(env):
         return {"irrigation": 0, "N": 0}
 
-    farm.run_season(action_fn=no_intervention)
+    if args.open_loop:
+        print("Modo open-loop: sem intervenção da IA.")
+        farm.run_season(action_fn=no_intervention, max_days=args.max_days)
+        return
+
+    # ── Loop fechado com a IA ────────────────────────────────────────────────
+    with open(args.credentials) as f:
+        creds = json.load(f)
+    mqtt_host = args.mqtt_host or (urlparse(creds["magistrala_url"]).hostname or "localhost")
+
+    listener = CommandListener(
+        host=mqtt_host,
+        port=args.mqtt_port,
+        domain_id=creds["domain_id"],
+        channel_id=creds["channel_id"],
+        client_id=creds["client_id"],
+        client_secret=creds["client_secret"],
+        protocol_id=f"{creds['farm_id']}-listener",
+    )
+    listener.start()
+    print(f"Loop fechado ativo (broker {mqtt_host}:{args.mqtt_port}, "
+          f"timeout {args.decision_timeout}s/dia).")
+
+    def ai_decision(env):
+        # Dia 1 ainda não publicou nada → sem ação prévia.
+        epoch = farm.last_published_epoch
+        if epoch is None:
+            return {"irrigation": 0, "N": 0}
+        cmd = listener.wait_for(epoch, timeout=args.decision_timeout)
+        if cmd is None:
+            print(f"[run_farm] sem comando para t={epoch} em {args.decision_timeout}s "
+                  f"— fallback no_intervention")
+            return {"irrigation": 0, "N": 0}
+        print(f"[run_farm] aplicando decisão da IA (t={epoch}): "
+              f"irrig={cmd['irrigation']}mm N={cmd['N']}kg")
+        return cmd
+
+    try:
+        farm.run_season(action_fn=ai_decision, max_days=args.max_days)
+    finally:
+        listener.stop()
 
 
 if __name__ == "__main__":

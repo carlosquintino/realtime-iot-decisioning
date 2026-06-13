@@ -1,0 +1,14 @@
+# Imagem do serviço LAI (chat conversacional + MCP sobre as decisões da IA).
+# Build context = raiz do repo (ver docker/addons/lai/docker-compose.yaml).
+FROM python:3.13-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+
+COPY src/lai/requirements.txt /app/src/lai/requirements.txt
+RUN pip install --no-cache-dir -r /app/src/lai/requirements.txt
+
+COPY src/ /app/src/
+
+EXPOSE 9090
+CMD ["uvicorn", "src.lai.chat:app", "--host", "0.0.0.0", "--port", "9090"]
