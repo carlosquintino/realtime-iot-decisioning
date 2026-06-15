@@ -88,7 +88,8 @@ def on_message(client, userdata, msg):
                  farm_id, data_date, snapshot.get("DVS"), snapshot.get("SM"))
 
         weather = get_weather_forecast()
-        decision = _get_crew().run(snapshot, weather, data_date)
+        farm_info = db.get_farm_info(farm_id)
+        decision = _get_crew().run(snapshot, weather, data_date, farm_info=farm_info)
 
         db.insert_decision(
             farm_id=farm_id,

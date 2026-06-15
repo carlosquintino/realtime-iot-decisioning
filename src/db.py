@@ -31,6 +31,29 @@ def get_farm_owner(farm_id: str) -> str | None:
         return row[0] if row else None
 
 
+def get_farm_info(farm_id: str) -> dict | None:
+    """Metadados da cultura/local da fazenda (de farm_owners) para dar contexto
+    agronômico ao crew de decisão. Retorna None se a fazenda não estiver mapeada.
+    """
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT crop_name, crop_variety, location_name, latitude, longitude, season_start "
+            "FROM farm_owners WHERE farm_id = %s",
+            (farm_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "crop_name": row[0],
+            "crop_variety": row[1],
+            "location_name": row[2],
+            "latitude": row[3],
+            "longitude": row[4],
+            "season_start": row[5].isoformat() if row[5] else None,
+        }
+
+
 def decision_exists(farm_id: str, data_date: str) -> bool:
     """Idempotência: já existe decisão para esta fazenda neste dia?"""
     with _connect() as conn, conn.cursor() as cur:

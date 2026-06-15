@@ -29,7 +29,7 @@ class FarmSimulator:
         An already-instantiated CreateCrop environment.
     """
 
-    def __init__(self, credentials_path: str, crop_env):
+    def __init__(self, credentials_path: str, crop_env, viz=None):
         with open(credentials_path) as f:
             creds = json.load(f)
 
@@ -52,6 +52,9 @@ class FarmSimulator:
         })
 
         self.env = crop_env
+        # Visualizador gráfico opcional (ver farm_viz.FarmVisualizer); desenha
+        # um quadro por dia mostrando a cultura e a ação aplicada.
+        self.viz = viz
         # Epoch (t) do último dia publicado — usado para correlacionar o comando
         # que volta pelo loop fechado (ver command_listener.py).
         self.last_published_epoch = None
@@ -123,6 +126,35 @@ class FarmSimulator:
             )
         except requests.RequestException as e:
             print(f"[{self.farm_id}] {sim_day}  FALHA ao enviar: {e}")
+
+        # Visualização gráfica do dia (cultura + ação da IA), se habilitada.
+        if self.viz is not None:
+            self.viz.render_day(
+                day_index=entry["days_gone"],
+                sim_date=sim_day,
+                metrics=self._viz_metrics(entry),
+                action=action,
+            )
+
+    @staticmethod
+    def _viz_metrics(entry: dict) -> dict:
+        """Extrai do snapshot do dia as métricas usadas pelo visualizador."""
+        cm = entry["obs"]["crop_model"]
+        wx = entry["obs"]["weather"]
+
+        def first(d, key):
+            vals = d.get(key)
+            return vals[0] if vals and vals[0] is not None else None
+
+        return {
+            "DVS":   first(cm, "DVS"),
+            "LAI":   first(cm, "LAI"),
+            "SM":    first(cm, "SM"),
+            "RFTRA": first(cm, "RFTRA"),
+            "NNI":   first(cm, "NNI"),
+            "TWSO":  first(cm, "TWSO"),
+            "RAIN":  first(wx, "RAIN"),
+        }
 
     def run_season(self, action_fn=None, max_days=None):
         """

@@ -1,0 +1,6 @@
+# Dependências da visualização gráfica da simulação (run_farm.py --viz).
+# Instale no venv do crop-gym:  venv/bin/pip install -r requirements-viz.txt
+pygame>=2.6
+imageio>=2.37
+imageio-ffmpeg>=0.5   # binário do ffmpeg embutido (monta o MP4 sem ffmpeg no sistema)
+Pillow>=10           # fallback para o GIF resumo

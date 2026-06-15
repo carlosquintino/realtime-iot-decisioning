@@ -62,6 +62,20 @@ def build_crop_env(wav: float = 10) -> CreateCrop:
     )
 
 
+def _keep_live(viz, port):
+    """Mantém a tela ao vivo no ar após a temporada até o usuário interromper."""
+    if viz is None or not getattr(viz, "live", False):
+        return
+    import time
+    print(f"\n[viz] Simulação concluída. Tela ao vivo continua em "
+          f"http://<IP>:{port}/  (Ctrl-C para encerrar).")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[viz] encerrando tela ao vivo.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -80,6 +94,14 @@ def main():
                         help="Limita a temporada a N dias (teste do loop sem estourar a cota do LLM)")
     parser.add_argument("--wav", type=float, default=10,
                         help="Água inicial no perfil do solo [cm]. Baixo (ex.: 1-2) = solo seco p/ forçar irrigação")
+    parser.add_argument("--viz", action="store_true",
+                        help="Gera uma visualização gráfica da fazenda (vídeo MP4 + GIF) com a cultura e a ação da IA por dia")
+    parser.add_argument("--viz-out", default=os.path.join(_DIR, "..", "sim_farm.mp4"),
+                        help="Caminho de saída do vídeo da visualização (.mp4); o GIF usa o mesmo nome com .gif")
+    parser.add_argument("--live", action="store_true",
+                        help="Abre a tela da fazenda AO VIVO no navegador (stream MJPEG) durante a simulação. Implica --viz.")
+    parser.add_argument("--live-port", type=int, default=8090,
+                        help="Porta do servidor da tela ao vivo (default 8090)")
     args = parser.parse_args()
 
     if not os.path.exists(args.credentials):
@@ -93,9 +115,25 @@ def main():
     print("Inicializando ambiente de simulação da cultura...")
     crop_env = build_crop_env(wav=args.wav)
 
+    viz = None
+    if args.viz or args.live:
+        from farm_viz import FarmVisualizer
+        season_len = (crop_env.crop_end_date - crop_env.crop_start_date).days + 1
+        total_days = min(season_len, args.max_days) if args.max_days else season_len
+        viz = FarmVisualizer(
+            out_path=os.path.abspath(args.viz_out),
+            crop_name="Batata",
+            location="Suzano-SP",
+            total_days=total_days,
+            live=args.live,
+            live_port=args.live_port,
+        )
+        print(f"Visualização habilitada → {os.path.abspath(args.viz_out)} (+ .gif)")
+
     farm = FarmSimulator(
         credentials_path=args.credentials,
         crop_env=crop_env,
+        viz=viz,
     )
 
     def no_intervention(env):
@@ -103,7 +141,12 @@ def main():
 
     if args.open_loop:
         print("Modo open-loop: sem intervenção da IA.")
-        farm.run_season(action_fn=no_intervention, max_days=args.max_days)
+        try:
+            farm.run_season(action_fn=no_intervention, max_days=args.max_days)
+            _keep_live(viz, args.live_port)
+        finally:
+            if viz is not None:
+                viz.close()
         return
 
     # ── Loop fechado com a IA ────────────────────────────────────────────────
@@ -140,8 +183,11 @@ def main():
 
     try:
         farm.run_season(action_fn=ai_decision, max_days=args.max_days)
+        _keep_live(viz, args.live_port)
     finally:
         listener.stop()
+        if viz is not None:
+            viz.close()
 
 
 if __name__ == "__main__":
